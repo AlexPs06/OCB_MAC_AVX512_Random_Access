@@ -118,9 +118,9 @@ int main(int argc, char **argv)
 	printf("Starting run...\n");fflush(stdout);
 
 
-	/*
-	 * Get time for key setup
-	 */
+	// /*
+	//  * Get time for key setup
+	//  */
 	// iters = (int)(Hz/520);
 	// do {
 	
@@ -208,7 +208,9 @@ static void PMAC(unsigned char *K_1, unsigned char *N,unsigned char *M, int size
     __m128i Tag = _mm_setzero_si128();;
     __m128i keys_128[11];
     __m512i keys_512[11];
-    __m512i keys_0[2];
+    __m512i keys_0[3];
+    __m128i keys_0_128[3];
+
     __m512i S_temp;
 
     __m512i sum_nonce = _mm512_set_epi64(0,4, 0,4, 0,4, 0,4);
@@ -217,6 +219,10 @@ static void PMAC(unsigned char *K_1, unsigned char *N,unsigned char *M, int size
 
     keys_0[0] = _mm512_setzero_si512();
     keys_0[1] = _mm512_setzero_si512();
+    keys_0[2] = _mm512_setzero_si512();
+    keys_0_128[0] = _mm_setzero_si128();
+    keys_0_128[1] = _mm_setzero_si128();
+    keys_0_128[2] = _mm_setzero_si128();
 
 
     AES_128_Key_Expansion(K_1, keys_128);
@@ -238,10 +244,6 @@ static void PMAC(unsigned char *K_1, unsigned char *N,unsigned char *M, int size
     S.bl512 = _mm512_setzero_si512();
     sum_nonce = _mm512_set_epi64(0,4, 0,4, 0,4, 0,4);
 
-
-
-    // imprimiArreglo(16,(unsigned char*)&plain_text[0]);
-
     for (size_t i = 0; i < m_blocks; i++){
 
         nonce_temp[0]=nonce_512; 
@@ -251,11 +253,6 @@ static void PMAC(unsigned char *K_1, unsigned char *N,unsigned char *M, int size
         plain_text[i] =_mm512_xor_si512(plain_text[i],nonce_temp[0]);
         
         AES_encrypt_512(plain_text[i], &plain_text[i], keys_512, 10);
-
-        // imprimiArreglo(16,(unsigned char*)&plain_text[i]);
-        // imprimiArreglo(16,(unsigned char*)&plain_text[i]+16);
-        // imprimiArreglo(16,(unsigned char*)&plain_text[i]+32);
-        // imprimiArreglo(16,(unsigned char*)&plain_text[i]+48);
 
         S_temp=_mm512_xor_epi64(plain_text[i],S_temp);        
         nonce_512=_mm512_add_epi64(nonce_512, sum_nonce);
@@ -267,8 +264,14 @@ static void PMAC(unsigned char *K_1, unsigned char *N,unsigned char *M, int size
     for (size_t i = 0; i < 4; i++){
         Tag=_mm_xor_si128(Tag,S.bl128[i]);
     }
+    S.bl512=nonce_512;
+    nonce = S.bl128[0];
 
-    AES_encrypt(Tag, &Tag, keys_128, 10);
+    AES_encrypt(nonce, &nonce, keys_0_128, 2);
+
+    AES_encrypt(nonce, &nonce, keys_128, 10);
+    
+    Tag=_mm_xor_si128(Tag,nonce);
 	_mm_store_si128 ((__m128i*)T,Tag);
 }
 
